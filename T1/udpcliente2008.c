@@ -14,9 +14,13 @@
 #include <stdlib.h>
 #include <netdb.h>
 
+#include <time.h>
+
+#define NSEC_PER_SEC (1000000000) /* The number of nsecs per sec. */
+
 #define FALHA 1
 
-#define	TAM_MEU_BUFFER	1000
+#define	TAM_MEU_BUFFER 1000
 
 int cria_socket_local(void)
 {
@@ -25,7 +29,7 @@ int cria_socket_local(void)
 	socket_local = socket( PF_INET, SOCK_DGRAM, 0);
 	if (socket_local < 0) {
 		perror("socket");
-		return;
+		return -1;
 	}
 	return socket_local;
 }
@@ -98,24 +102,41 @@ int main(int argc, char *argv[])
 
 	struct sockaddr_in endereco_destino = cria_endereco_destino(argv[1], porta_destino);
 
-	int i = 0;    
+	int size_incoming_message = 1000;    
 	char msg_enviada[1000];  
-	char msg_recebida[1000];
+	char msg_recebida[size_incoming_message];
 	int nrec;
 
-	do{
-		printf("tentativa %d\n", i);
-		sprintf(msg_enviada, "tentativa %d ", i);		
-		strcat(msg_enviada, argv[3]);
+	struct timespec t0, t1;
+  int interval = 300000000; /* 300ms*/
+	long response_time;
 
-		envia_mensagem(socket_local, endereco_destino, msg_enviada);
+  clock_gettime(CLOCK_MONOTONIC ,&t0);
 
-		nrec = recebe_mensagem(socket_local, msg_recebida, 1000);
+  /* start after one second */
+  t0.tv_sec++;
+
+  while(1) {
+    /* wait until next shot */
+    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
+
+		envia_mensagem(socket_local, endereco_destino, "st-0");
+		nrec = recebe_mensagem(socket_local, msg_recebida, size_incoming_message);
+		msg_recebida[nrec] = '\0';
+
+		clock_gettime(CLOCK_MONOTONIC ,&t1);
+
 		printf("Mensagem de resposta com %d bytes >>>%s\n", nrec, msg_recebida);
 
-		sleep(1);
-		++i;
+		response_time = (t1.tv_sec - t0.tv_sec) * NSEC_PER_SEC + (t1.tv_nsec - t0.tv_nsec);
 
-	} while( i < 5000 );
+		printf("Response time: %ld \n", response_time);
 
+    t0.tv_nsec += interval;
+
+    while (t0.tv_nsec >= NSEC_PER_SEC) {
+      t0.tv_nsec -= NSEC_PER_SEC;
+      t0.tv_sec++;
+    }
+   }
 }

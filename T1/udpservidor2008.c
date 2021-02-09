@@ -15,8 +15,6 @@
 
 #define	TAM_MEU_BUFFER	1000
 
-
-
 int cria_socket_local(void)
 {
 	int socket_local;			/* Socket usado nesta máquina */
@@ -29,9 +27,6 @@ int cria_socket_local(void)
 
 	return socket_local;
 }
-
-
-
 
 void define_porta_escutada(int socket_local, int porta_escutada)
 {
@@ -50,8 +45,6 @@ void define_porta_escutada(int socket_local, int porta_escutada)
 	}
 }
 
-
-
 int recebe_mensagem( char *buffer, int tam_buffer, int socket_local, struct sockaddr_in *endereco_cliente, int *tam_c)
 {
 	int bytes_recebidos;			/* Número de bytes recebidos */
@@ -68,9 +61,6 @@ int recebe_mensagem( char *buffer, int tam_buffer, int socket_local, struct sock
 	return bytes_recebidos;
 }
 
-
-
-
 void envia_mensagem(char *mensagem, int socket_local, struct sockaddr_in *endereco_cliente, int tam_c )
 {
 	if (sendto(socket_local, mensagem, strlen(mensagem)+1, 0, (struct sockaddr *) endereco_cliente, tam_c) < 0) {
@@ -78,10 +68,6 @@ void envia_mensagem(char *mensagem, int socket_local, struct sockaddr_in *endere
 		exit(FALHA);
 	}
 }
-
-
-
-
 
 int main(int argc, char *argv[])
 {
