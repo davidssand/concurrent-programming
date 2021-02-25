@@ -76,12 +76,28 @@ int recebe_mensagem(int socket_local, char *buffer, int TAM_BUFFER)
 
 	/* Espera pela msg de resposta do servidor */
 	bytes_recebidos = recvfrom(socket_local, buffer, TAM_BUFFER, 0, NULL, 0);
-	if (bytes_recebidos < 0)
-	{
+	if (bytes_recebidos < 0) {
 		perror("recvfrom");
 	}
 
 	return bytes_recebidos;
+}
+
+int send_request(int socket_local, struct sockaddr_in endereco_destino, char *mensagem, char *buffer, int TAM_BUFFER){
+	int nrec;
+	
+	envia_mensagem(socket_local, endereco_destino, mensagem);
+	nrec = recebe_mensagem(socket_local, buffer, TAM_BUFFER);
+	buffer[nrec] = '\0';
+	return nrec;
+}
+
+void slice_str(const char * str, char * buffer, size_t start, size_t end){
+  size_t j = 0;
+  for (size_t i = start; i <= end; ++i) {
+    buffer[j++] = str[i];
+  }
+  buffer[j] = 0;
 }
 
 int main(int argc, char *argv[])
@@ -103,12 +119,23 @@ int main(int argc, char *argv[])
 	struct sockaddr_in endereco_destino = cria_endereco_destino(argv[1], porta_destino);
 
 	int size_incoming_message = 1000;    
-	char msg_enviada[1000];  
-	char msg_recebida[size_incoming_message];
-	int nrec;
+
+	char T_msg_recebida[size_incoming_message];
+	int nrec_T;
+	const size_t T_len = strlen(T_msg_recebida);
+  char sliced_T_msg_recebida[T_len + 1];
+	float Temperature;
+
+	char Na_msg_recebida[size_incoming_message];
+	int nrec_Na;
+
+	float ref = 40.0;
+	float error;
 
 	struct timespec t0, t1;
-  int interval = 300000000; /* 300ms*/
+  // int interval = 300000000; /* 300ms*/
+  int interval = 1000000000; /* 300ms*/
+
 	long response_time;
 
   clock_gettime(CLOCK_MONOTONIC ,&t0);
@@ -120,13 +147,18 @@ int main(int argc, char *argv[])
     /* wait until next shot */
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
-		envia_mensagem(socket_local, endereco_destino, "st-0");
-		nrec = recebe_mensagem(socket_local, msg_recebida, size_incoming_message);
-		msg_recebida[nrec] = '\0';
+		nrec_T = send_request(socket_local, endereco_destino, "st-0", T_msg_recebida, size_incoming_message);
+		nrec_Na = send_request(socket_local, endereco_destino, "ana7", Na_msg_recebida, size_incoming_message);
+  	slice_str(T_msg_recebida, sliced_T_msg_recebida, 3, size_incoming_message);
+		Temperature = atof(sliced_T_msg_recebida);
 
+		error = ref - Temperature;
+		
 		clock_gettime(CLOCK_MONOTONIC ,&t1);
 
-		printf("Mensagem de resposta com %d bytes >>>%s\n", nrec, msg_recebida);
+		printf("Temperature - Mensagem de resposta com %d bytes >>> %f\n", nrec_T, Temperature);
+		printf("Na - Mensagem de resposta com %d bytes >>> %s\n", nrec_Na, Na_msg_recebida);
+		printf("Reference error >>> %f\n", error);
 
 		response_time = (t1.tv_sec - t0.tv_sec) * NSEC_PER_SEC + (t1.tv_nsec - t0.tv_nsec);
 
@@ -138,5 +170,6 @@ int main(int argc, char *argv[])
       t0.tv_nsec -= NSEC_PER_SEC;
       t0.tv_sec++;
     }
-   }
+		printf("\n");
+	}
 }

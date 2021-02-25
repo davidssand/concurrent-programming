@@ -1,0 +1,133 @@
+DAS5306: Programação Concorrente e Sistemas de Tempo Real
+Trabalhos para 2020/2
+Sugestão para quem usa Windows normalmente: virtualbox
+
+ 
+
+T1 - Trabalho do controlador de sistemas contínuos sequencial e tempo real
+Implementar o controle e a supervisão do sistema descrito aqui.
+
+Simulador é usado para simular uma unidade de caldeira e é chamado com:
+java -jar aquecedor2008_1.jar <número-porta-escutada>
+
+A caldeira possui instrumentação embutida e aceita os seguintes comandos:
+"sta0" lê valor de Ta
+"st-0" lê valor de T
+"sti0" lê valor de Ti
+"sno0" lê valor de No
+"sh-0" lê valor de H
+"ani123.4" define valor de Ni como 123.4
+"aq-567.8" define valor de Q como 567.8
+"ana123.4" define valor de Na como 123.4
+"anf123.4" define valor de Nf como 123.4
+
+Cuidado com a formatação dos valores em ponto flutuante.
+
+Implementar em C no Linux o programa CONTROLADOR, o qual deve incluir as seguintes funcionalidades de controle:
+
+- Laço de controle como tarefa periódica para a temperatura;
+- Uso do tanque auxiliar e da saída de água;
+- Informações na tela sobre a situação corrente.
+
+Outros requisitos:
+- Não usar threads;
+- Período do controlador de temperatura deve ser 30ms exato, ver exemplo;
+- Atualização da tela pode ser aproximadamente a cada 1 segundo.
+
+ 
+
+Medições de tempo real
+Partindo do programa controlador desenvolvido, meça o tempo de resposta do controle de temperatura.
+
+O tempo de resposta inicia no momento t de acordar. Após concluir o controlador, antes de calcular o novo t de acordar, obtenha a hora atual t1. Com "t1 - t" temos o tempo de resposta do controlador em questão. Cuidado com a divisão de segundos e nanosegundos. Para maior precisão, NÃO converta para float ou double, mas mantenha em long+long (segundos e nanosegundos) até fazer a subtração.
+
+Armazene esta informação em um array e depois de algum tempo grave em arquivo.
+
+Apresente um histograma destas medições. Identifique o pior caso, isto é, o maior tempo de resposta observado (high water mark).
+
+Até que período seria possível levar o controlador nestas condições de execução ?
+
+Usar as funções clock_nanosleep e clock_gettime.
+
+Adicionalmente:
+
+- Número de amostras >= 10000.
+
+- Usar como unidade microsegundo nos gráficos.
+
+- Fazer a coleta dos dados em máquina real e não em máquina virtual.
+
+- Gerar relatório em PDF com texto descrevendo as observações e os gráficos.
+
+ 
+
+ 
+
+T2 - Trabalho do controlador de sistemas contínuos concorrente
+Implementar o controle e a supervisão do sistema descrito aqui.
+
+Simulador é usado para simular uma unidade de caldeira e é chamado com:
+java -jar aquecedor2008_1.jar <número-porta-escutada>
+
+A caldeira possui instrumentação embutida e aceita os seguintes comandos:
+"sta0" lê valor de Ta
+"st-0" lê valor de T
+"sti0" lê valor de Ti
+"sno0" lê valor de No
+"sh-0" lê valor de H
+"ani123.4" define valor de Ni como 123.4
+"aq-567.8" define valor de Q como 567.8
+"ana123.4" define valor de Na como 123.4
+"anf123.4" define valor de Nf como 123.4
+
+Cuidado com a formatação dos valores em ponto flutuante.
+
+Implementar em C no Linux o programa CONTROLADOR, o qual deve incluir as seguintes funcionalidades de controle:
+
+- Laço de controle como tarefa periódica para a temperatura;
+
+- Laço de controle como tarefa periódica para o nível;
+
+- Uso do tanque auxiliar e da saída de água;
+
+- Informações na tela sobre a situação corrente;
+
+- Verificação da temperatura a cada 10ms para disparo de tarefa de alarme caso esteja acima de 30 graus.
+
+- Entrada através do teclado dos valores de referência para nível e temperatura;
+
+- Armazenagem periódica dos valores lidos de temperatura e armazenagem desses dados
+em arquivo, através de buffer duplo (produtor/consumidor).
+
+ 
+
+Outros requisitos:
+- Usar mutex para proteger as variáveis compartilhadas;
+- Tarefas periódicas implementadas com precisão e não com sleep fixo;
+- Período do controlador de temperatura deve ser 50ms;
+- Período do controlador de nível deve ser 70ms;
+- Atualização da tela pode ser com sleep simples de 1 segundo.
+
+
+Alguns aspectos para a composição da nota do trabalho do controlador:
+- Fez no Linux, em C, usando a biblioteca das pthreads ?
+- Foi usado um mutex para cada estrutura compartilhada ?
+- A aplicação apresenta valores dos sensores na tela ?
+- A aplicação possui laços de controle para temperatura e nível ?
+- A aplicação acessa teclado durante a execução do controlador, afeta valor de referência ?
+- A aplicação grava leituras em arquivo ?
+- As tarefas de controle são realmente periódicas ?
+- Existe uma tarefa para o alarme ?
+
+
+T3 – Programação Concorrente
+Implemente uma simulação usando programação concorrente, onde os elementos ativos (pessoas, carros, máquinas, etc) são representados por threads, e os elementos passivos usados por eles (elevador, cruzamento, peças, etc) são representados por monitores acessados pelas threads.
+
+A simulação será construida como um programa concorrente em C usando a biblioteca das pthreads. Os elementos ativos são representados por threads, e a descrição do ambiente onde ocorre a interação entre eles deve ser feita através de variáveis globais compartilhadas, cujo acesso é regulado por monitores. A evolução do estado do sistema ocorre conforme a dinâmica do sistema simulado. Sleep pode ser usado para simular ações demoradas.
+
+Exemplos de sistemas que podem ser simulados: tráfego urbano, tráfego aéreo, tráfego ferroviário, manufatura, bolsa de valores, sistemas militares, sistemas ecológicos, etc.
+
+Cada grupo deve descrever sua proposta e obter aprovação para ela antes de implementar. Cada grupo deve implementar uma simulação diferente.
+
+A simulação será realizada por um programa único composto por muitas threads. O uso de comunicação via UDP é opcional, não será cobrado. Mas pode ser usado caso o grupo julgue conveniente para a simulação em questão.
+
