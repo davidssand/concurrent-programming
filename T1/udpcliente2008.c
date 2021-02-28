@@ -100,10 +100,6 @@ void slice_str(const char * str, char * buffer, size_t start, size_t end){
   buffer[j] = 0;
 }
 
-// int controller(){
-
-// }
-
 int main(int argc, char *argv[])
 {
 	if (argc < 4) { 
@@ -116,51 +112,89 @@ int main(int argc, char *argv[])
 		exit(FALHA);
 	}
 
+	// Socket
 	int porta_destino = atoi( argv[2]);
-
 	int socket_local = cria_socket_local();
-
 	struct sockaddr_in endereco_destino = cria_endereco_destino(argv[1], porta_destino);
 
+	// Message
 	int size_incoming_message = 1000;    
-
 	char T_msg_recebida[size_incoming_message];
 	int nrec_T;
 	const size_t T_len = strlen(T_msg_recebida);
   char sliced_T_msg_recebida[T_len + 1];
 	float Temperature;
-
 	char Na_msg_recebida[size_incoming_message];
 	int nrec_Na;
 
-	float ref = 40.0;
+	// Controller
+		// Proportional
+	float kp = 10;
+	float proportional_control;
+
+		// Integral
+	float ki = 0.1;
+	float integral;
+	float previous_integral = 0;
+	float integral_control;
+
+	float control_action;
+	char control_action_str[100];
+
+	float ref = atof(argv[3]);
 	float error;
 
+	// Time
 	struct timespec t0, t1;
   const int small_interval = 250000000;
   const int big_interval = 1000000000; /* 1000ms*/
   const int small_intervals_in_big_interval = big_interval / small_interval; /* 1000ms*/
   int small_loop_count = 0; /* 1000ms*/
-
 	long response_time;
-
   clock_gettime(CLOCK_MONOTONIC ,&t0);
+  t0.tv_sec++; // start after one second
 
-  /* start after one second */
-  t0.tv_sec++;
+
+	printf("\n\nReference >>>>>>>> %f <<<<<<<<\n\n", ref);
 
   while(1) {
+		char control_action_str_parsed[103] = "ana";
     /* wait until next shot */
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
-		// controller();
-
+		// Collect data
 		nrec_T = send_request(socket_local, endereco_destino, "st-0", T_msg_recebida, size_incoming_message);
-		nrec_Na = send_request(socket_local, endereco_destino, "ana7", Na_msg_recebida, size_incoming_message);
   	slice_str(T_msg_recebida, sliced_T_msg_recebida, 3, size_incoming_message);
 		Temperature = atof(sliced_T_msg_recebida);
 
+		// Calculate error
 		error = ref - Temperature;
+
+		// Controller
+			// Proportional
+		proportional_control = kp * error;
+		
+			// Integral
+		integral = previous_integral + error * small_interval / 1000000000;
+		integral_control = ki * integral ;
+
+			// Sum control actions
+		control_action = proportional_control + integral_control;
+		if (control_action > 10){
+			control_action = 10;
+		} else if (control_action < 0){
+			control_action = 0;
+		}
+		
+		gcvt(control_action, 8, control_action_str); 
+		strcat(control_action_str_parsed, control_action_str);
+
+			// Store current integral value for next loop
+		previous_integral = integral;
+
+		nrec_Na = send_request(socket_local, endereco_destino, control_action_str_parsed, Na_msg_recebida, size_incoming_message);
+
+		// strcpy(str, "these ");
 		
 		clock_gettime(CLOCK_MONOTONIC, &t1);
 
@@ -175,13 +209,15 @@ int main(int argc, char *argv[])
 
 		small_loop_count++;
 
-		printf("count %d\n", small_loop_count);
+		// printf("count %d\n", small_loop_count);
 
 		if (small_loop_count >= small_intervals_in_big_interval){
 			printf("Temperature - Mensagem de resposta com %d bytes >>> %f\n", nrec_T, Temperature);
 			printf("Na - Mensagem de resposta com %d bytes >>> %s\n", nrec_Na, Na_msg_recebida);
 			printf("Reference error >>> %f\n", error);
 			printf("Response time: %ld \n", response_time);
+			printf("Str Control - >>> %s\n", control_action_str_parsed);
+
 
 			printf("\n");
 			small_loop_count = 0;
