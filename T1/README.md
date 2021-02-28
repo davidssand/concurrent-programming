@@ -1,5 +1,5 @@
 java -jar aquecedor2008_1.jar 6565
-gcc -o udp udpcliente2008.c
+gcc -o udp udpcliente2008.c && ./udp localhost 6565 mensagem
 
 # Control
 H in (0.1, 3)m

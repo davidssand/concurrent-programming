@@ -100,6 +100,10 @@ void slice_str(const char * str, char * buffer, size_t start, size_t end){
   buffer[j] = 0;
 }
 
+// int controller(){
+
+// }
+
 int main(int argc, char *argv[])
 {
 	if (argc < 4) { 
@@ -133,8 +137,10 @@ int main(int argc, char *argv[])
 	float error;
 
 	struct timespec t0, t1;
-  // int interval = 300000000; /* 300ms*/
-  int interval = 1000000000; /* 300ms*/
+  const int small_interval = 250000000;
+  const int big_interval = 1000000000; /* 1000ms*/
+  const int small_intervals_in_big_interval = big_interval / small_interval; /* 1000ms*/
+  int small_loop_count = 0; /* 1000ms*/
 
 	long response_time;
 
@@ -147,6 +153,8 @@ int main(int argc, char *argv[])
     /* wait until next shot */
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
+		// controller();
+
 		nrec_T = send_request(socket_local, endereco_destino, "st-0", T_msg_recebida, size_incoming_message);
 		nrec_Na = send_request(socket_local, endereco_destino, "ana7", Na_msg_recebida, size_incoming_message);
   	slice_str(T_msg_recebida, sliced_T_msg_recebida, 3, size_incoming_message);
@@ -154,22 +162,29 @@ int main(int argc, char *argv[])
 
 		error = ref - Temperature;
 		
-		clock_gettime(CLOCK_MONOTONIC ,&t1);
-
-		printf("Temperature - Mensagem de resposta com %d bytes >>> %f\n", nrec_T, Temperature);
-		printf("Na - Mensagem de resposta com %d bytes >>> %s\n", nrec_Na, Na_msg_recebida);
-		printf("Reference error >>> %f\n", error);
+		clock_gettime(CLOCK_MONOTONIC, &t1);
 
 		response_time = (t1.tv_sec - t0.tv_sec) * NSEC_PER_SEC + (t1.tv_nsec - t0.tv_nsec);
 
-		printf("Response time: %ld \n", response_time);
-
-    t0.tv_nsec += interval;
+		t0.tv_nsec += small_interval;
 
     while (t0.tv_nsec >= NSEC_PER_SEC) {
       t0.tv_nsec -= NSEC_PER_SEC;
       t0.tv_sec++;
     }
-		printf("\n");
+
+		small_loop_count++;
+
+		printf("count %d\n", small_loop_count);
+
+		if (small_loop_count >= small_intervals_in_big_interval){
+			printf("Temperature - Mensagem de resposta com %d bytes >>> %f\n", nrec_T, Temperature);
+			printf("Na - Mensagem de resposta com %d bytes >>> %s\n", nrec_Na, Na_msg_recebida);
+			printf("Reference error >>> %f\n", error);
+			printf("Response time: %ld \n", response_time);
+
+			printf("\n");
+			small_loop_count = 0;
+		}
 	}
 }
