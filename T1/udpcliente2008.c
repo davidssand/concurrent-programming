@@ -129,17 +129,19 @@ int main(int argc, char *argv[])
 
 	// Controller
 		// Proportional
+		// kp manually adjusted
 	float kp = 10;
 	float proportional_control;
 
 		// Integral
+		// ki manually adjusted
 	float ki = 0.1;
 	float integral;
 	float previous_integral = 0;
 	float integral_control;
 
-	float control_action;
-	char control_action_str[100];
+	float Na;
+	char Na_str[100];
 
 	float ref = atof(argv[3]);
 	float error;
@@ -154,11 +156,8 @@ int main(int argc, char *argv[])
   clock_gettime(CLOCK_MONOTONIC ,&t0);
   t0.tv_sec++; // start after one second
 
-
-	printf("\n\nReference >>>>>>>> %f <<<<<<<<\n\n", ref);
-
   while(1) {
-		char control_action_str_parsed[103] = "ana";
+		char Na_str_parsed[103] = "ana";
     /* wait until next shot */
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
@@ -176,23 +175,27 @@ int main(int argc, char *argv[])
 		
 			// Integral
 		integral = previous_integral + error * small_interval / 1000000000;
+
 		integral_control = ki * integral ;
 
 			// Sum control actions
-		control_action = proportional_control + integral_control;
-		if (control_action > 10){
-			control_action = 10;
-		} else if (control_action < 0){
-			control_action = 0;
-		}
+		Na = proportional_control + integral_control;
 		
-		gcvt(control_action, 8, control_action_str); 
-		strcat(control_action_str_parsed, control_action_str);
+		if (Na > 10){
+			Na = 10;
+			integral = 10;
+		} else if (Na < 0){
+			Na = 0;
+			integral = 0;
+		}
+
+		gcvt(Na, 8, Na_str); 
+		strcat(Na_str_parsed, Na_str);
 
 			// Store current integral value for next loop
 		previous_integral = integral;
 
-		nrec_Na = send_request(socket_local, endereco_destino, control_action_str_parsed, Na_msg_recebida, size_incoming_message);
+		nrec_Na = send_request(socket_local, endereco_destino, Na_str_parsed, Na_msg_recebida, size_incoming_message);
 
 		// strcpy(str, "these ");
 		
@@ -212,12 +215,12 @@ int main(int argc, char *argv[])
 		// printf("count %d\n", small_loop_count);
 
 		if (small_loop_count >= small_intervals_in_big_interval){
+			printf("\n\nReference >>>>>>>> %f <<<<<<<<\n\n", ref);
 			printf("Temperature - Mensagem de resposta com %d bytes >>> %f\n", nrec_T, Temperature);
 			printf("Na - Mensagem de resposta com %d bytes >>> %s\n", nrec_Na, Na_msg_recebida);
 			printf("Reference error >>> %f\n", error);
 			printf("Response time: %ld \n", response_time);
-			printf("Str Control - >>> %s\n", control_action_str_parsed);
-
+			printf("Na - >>> %s\n", Na_str_parsed);
 
 			printf("\n");
 			small_loop_count = 0;
