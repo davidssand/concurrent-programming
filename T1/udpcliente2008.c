@@ -20,7 +20,31 @@
 
 #define FALHA 1
 
-#define	TAM_MEU_BUFFER 1000
+struct controller_setup {
+	char *prefix;
+	float overflow;
+	float underflow;
+
+	// Controller
+		// Ziegler–Nichols
+		// ku -> ultimate proportional gain (kp = ku, ki = 0 / system oscillates)
+		// pu -> oscillation period
+	float ku;
+	float pu;
+
+		// Proportional
+		// kp manually adjusted
+	float kp;
+
+		// Integral
+		// ki manually adjusted
+	float ki;
+
+	int TAM_BUFFER;
+
+	char control_action_str_parsed[103];
+	char control_received_message[1000];
+};
 
 int cria_socket_local(void)
 {
@@ -101,30 +125,15 @@ void slice_str(const char * str, char * buffer, size_t start, size_t end){
 }
 
 float controller(
+	struct controller_setup *cs,
 	int socket_local,
 	struct sockaddr_in endereco_destino,
 	const int small_interval,
 	float ref,
 	float *error_pointer,
 	char *temperature,
-	char *Na_msg_recebida,
 	int TAM_BUFFER
 ){
-	// Controller
-		// Ziegler–Nichols
-		// ku -> ultimate proportional gain (kp = ku, ki = 0 / system oscillates)
-		// pu -> oscillation period
-	float ku = 500.0;
-	float pu = 2;
-
-		// Proportional
-		// kp manually adjusted
-	float kp = 0.45 * ku;
-
-		// Integral
-		// ki manually adjusted
-	float ki = 1.2 * kp / pu;
-
 	float proportional_control;
 	float integral;
 	float previous_integral = 0;
@@ -132,7 +141,6 @@ float controller(
 
 	float control_action;
 	char control_action_str[100];
-	char control_action_str_parsed[103] = "ana";
 
 	float error;
 	
@@ -142,31 +150,33 @@ float controller(
 
 	// Controller
 		// Proportional
-	proportional_control = kp * error;
+	proportional_control = cs->kp * error;
 	
 		// Integral
 	integral = previous_integral + error * small_interval / 1000000000;
 
-	integral_control = ki * integral ;
+	integral_control = cs->ki * integral ;
 
 		// Sum control actions
 	control_action = proportional_control + integral_control;
 	
-	if (control_action > 10){
-		control_action = 10;
-		integral = 10;
-	} else if (control_action < 0){
-		control_action = 0;
-		integral = 0;
+	if (control_action > cs->overflow){
+		control_action = cs->overflow;
+		integral = cs->overflow;
+	} else if (control_action < cs->underflow){
+		control_action = cs->underflow;
+		integral = cs->underflow;
 	}
 
 	gcvt(control_action, 8, control_action_str); 
-	strcat(control_action_str_parsed, control_action_str);
+
+	strcpy(cs->control_action_str_parsed, cs->prefix);
+	strcat(cs->control_action_str_parsed, control_action_str);
 
 		// Store current integral value for next loop
 	previous_integral = integral;
 	
-	send_request(socket_local, endereco_destino, control_action_str_parsed, Na_msg_recebida, TAM_BUFFER);
+	send_request(socket_local, endereco_destino, cs->control_action_str_parsed, cs->control_received_message, TAM_BUFFER);
 }
 
 float read_and_parse_temperature(
@@ -203,7 +213,6 @@ int main(int argc, char *argv[])
 	// Message
 	int TAM_BUFFER = 1000;    
   char temperature[TAM_BUFFER + 1];
-	char Na_msg_recebida[TAM_BUFFER];
 
 	float ref = atof(argv[3]);
 	float error;
@@ -218,13 +227,24 @@ int main(int argc, char *argv[])
   clock_gettime(CLOCK_MONOTONIC ,&t0);
   t0.tv_sec++; // start after one second
 
+	struct controller_setup Na_controller_setup = {
+		"ana",
+		10,
+		0,
+		500.0,
+		2.0,
+		TAM_BUFFER,
+	};
+	Na_controller_setup.kp = 0.45 * Na_controller_setup.ku;
+	Na_controller_setup.ki = 1.2 * Na_controller_setup.kp / Na_controller_setup.pu;
+
   while(1) {
     /* wait until next shot */
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
 		read_and_parse_temperature(socket_local, endereco_destino, temperature, TAM_BUFFER);
 
-		controller(socket_local, endereco_destino, small_interval, ref, &error, temperature, Na_msg_recebida, TAM_BUFFER);
+		controller(&Na_controller_setup, socket_local, endereco_destino, small_interval, ref, &error, temperature, TAM_BUFFER);
 
 		clock_gettime(CLOCK_MONOTONIC, &t1);
 
@@ -245,7 +265,7 @@ int main(int argc, char *argv[])
 			printf("\n\n\n\n");
 			printf("Reference >>>>>>>> %f <<<<<<<<\n\n", ref);
 			printf("Temperature - Mensagem de resposta >>> %s\n", temperature);
-			printf("Na - Mensagem de resposta >>> %s\n", Na_msg_recebida);
+			printf("Na - Mensagem de resposta >>> %s\n", Na_controller_setup.control_received_message);
 			printf("Reference error >>> %f\n", error);
 			printf("Response time: %ld ns\n", response_time);
 
