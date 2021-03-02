@@ -126,12 +126,12 @@ void slice_str(const char * str, char * buffer, size_t start, size_t end){
 
 float controller(
 	struct controller_setup *cs,
+	float *error_pointer,
+	float ref,
+	char *temperature,
 	int socket_local,
 	struct sockaddr_in endereco_destino,
 	const int small_interval,
-	float ref,
-	float *error_pointer,
-	char *temperature,
 	int TAM_BUFFER
 ){
 	float proportional_control;
@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
 	// Time
 	struct timespec t0, t1;
   const int small_interval = 250000000;
-  const int big_interval = 250000000; /* 1000ms*/
+  const int big_interval = 500000000; /* 1000ms*/
   const int small_intervals_in_big_interval = big_interval / small_interval; /* 1000ms*/
   int small_loop_count = 0; /* 1000ms*/
 	long response_time;
@@ -229,14 +229,36 @@ int main(int argc, char *argv[])
 
 	struct controller_setup Na_controller_setup = {
 		"ana",
-		10,
-		0,
+		10.0,
+		0.0,
 		500.0,
-		2.0,
+		0.5,
 		TAM_BUFFER,
 	};
 	Na_controller_setup.kp = 0.45 * Na_controller_setup.ku;
 	Na_controller_setup.ki = 1.2 * Na_controller_setup.kp / Na_controller_setup.pu;
+
+	struct controller_setup Q_controller_setup = {
+		"aq-",
+		1000000.0,
+		0.0,
+		10000000.0,
+		0.5,
+		TAM_BUFFER,
+	};
+	Q_controller_setup.kp = 0.45 * Q_controller_setup.ku;
+	Q_controller_setup.ki = 1.2 * Q_controller_setup.kp / Q_controller_setup.pu;
+
+	struct controller_setup Ni_controller_setup = {
+		"ani",
+		100.0,
+		0.0,
+		-500.0,
+		0.5,
+		TAM_BUFFER,
+	};
+	Ni_controller_setup.kp = 0.45 * Ni_controller_setup.ku;
+	Ni_controller_setup.ki = 1.2 * Ni_controller_setup.kp / Ni_controller_setup.pu;
 
   while(1) {
     /* wait until next shot */
@@ -244,7 +266,9 @@ int main(int argc, char *argv[])
 
 		read_and_parse_temperature(socket_local, endereco_destino, temperature, TAM_BUFFER);
 
-		controller(&Na_controller_setup, socket_local, endereco_destino, small_interval, ref, &error, temperature, TAM_BUFFER);
+		controller(&Na_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		controller(&Q_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 
 		clock_gettime(CLOCK_MONOTONIC, &t1);
 
@@ -266,8 +290,10 @@ int main(int argc, char *argv[])
 			printf("Reference >>>>>>>> %f <<<<<<<<\n\n", ref);
 			printf("Temperature - Mensagem de resposta >>> %s\n", temperature);
 			printf("Na - Mensagem de resposta >>> %s\n", Na_controller_setup.control_received_message);
+			printf("Q - Mensagem de resposta >>> %s\n", Q_controller_setup.control_received_message);
+			printf("Ni - Mensagem de resposta >>> %s\n", Ni_controller_setup.control_received_message);
 			printf("Reference error >>> %f\n", error);
-			printf("Response time: %ld ns\n", response_time);
+			printf("Response time >>> %ld ns\n", response_time);
 
 			small_loop_count = 0;
 		}
