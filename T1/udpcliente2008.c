@@ -105,45 +105,40 @@ float controller(
 	struct sockaddr_in endereco_destino,
 	const int small_interval,
 	float ref,
-	char *T_msg_recebida,
-	char *sliced_T_msg_recebida,
+	float *error_pointer,
+	char *temperature,
 	char *Na_msg_recebida,
 	int TAM_BUFFER
-	){
+){
 	// Controller
 		// Ziegler–Nichols
 		// ku -> ultimate proportional gain (kp = ku, ki = 0 / system oscillates)
 		// pu -> oscillation period
-		float ku = 500.0;
-		float pu = 2;
+	float ku = 500.0;
+	float pu = 2;
 
 		// Proportional
 		// kp manually adjusted
 	float kp = 0.45 * ku;
-	float proportional_control;
 
 		// Integral
 		// ki manually adjusted
 	float ki = 1.2 * kp / pu;
+
+	float proportional_control;
 	float integral;
 	float previous_integral = 0;
 	float integral_control;
 
-	float Temperature;
 	float control_action;
 	char control_action_str[100];
 	char control_action_str_parsed[103] = "ana";
 
 	float error;
 	
-	// Collect data
-	send_request(socket_local, endereco_destino, "st-0", T_msg_recebida, TAM_BUFFER);
-	slice_str(T_msg_recebida, sliced_T_msg_recebida, 3, TAM_BUFFER);
-
-	Temperature = atof(sliced_T_msg_recebida);
-
 	// Calculate error
-	error = ref - Temperature;
+	error = ref - atof(temperature);
+	*error_pointer = error;
 
 	// Controller
 		// Proportional
@@ -170,10 +165,22 @@ float controller(
 
 		// Store current integral value for next loop
 	previous_integral = integral;
-
+	
 	send_request(socket_local, endereco_destino, control_action_str_parsed, Na_msg_recebida, TAM_BUFFER);
+}
 
-	return error;
+float read_and_parse_temperature(
+	int socket_local,
+	struct sockaddr_in endereco_destino,
+	char *temperature,
+	int TAM_BUFFER
+){
+	char T_msg_recebida[TAM_BUFFER];
+	char temperature_prefix[] = "st-0";
+	const size_t temperature_prefix_size = strlen(temperature_prefix);
+
+	send_request(socket_local, endereco_destino, "st-0", T_msg_recebida, TAM_BUFFER);
+	slice_str(T_msg_recebida, temperature, temperature_prefix_size - 1, TAM_BUFFER);
 }
 
 int main(int argc, char *argv[])
@@ -194,11 +201,9 @@ int main(int argc, char *argv[])
 	struct sockaddr_in endereco_destino = cria_endereco_destino(argv[1], porta_destino);
 
 	// Message
-	int size_incoming_message = 1000;    
-	char T_msg_recebida[size_incoming_message];
-	const size_t T_len = strlen(T_msg_recebida);
-  char sliced_T_msg_recebida[T_len + 1];
-	char Na_msg_recebida[size_incoming_message];
+	int TAM_BUFFER = 1000;    
+  char temperature[TAM_BUFFER + 1];
+	char Na_msg_recebida[TAM_BUFFER];
 
 	float ref = atof(argv[3]);
 	float error;
@@ -217,7 +222,9 @@ int main(int argc, char *argv[])
     /* wait until next shot */
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
-		error = controller(socket_local, endereco_destino, small_interval, ref, T_msg_recebida, sliced_T_msg_recebida, Na_msg_recebida, size_incoming_message);
+		read_and_parse_temperature(socket_local, endereco_destino, temperature, TAM_BUFFER);
+
+		controller(socket_local, endereco_destino, small_interval, ref, &error, temperature, Na_msg_recebida, TAM_BUFFER);
 
 		clock_gettime(CLOCK_MONOTONIC, &t1);
 
@@ -237,10 +244,10 @@ int main(int argc, char *argv[])
 		if (small_loop_count >= small_intervals_in_big_interval){
 			printf("\n\n\n\n");
 			printf("Reference >>>>>>>> %f <<<<<<<<\n\n", ref);
-			printf("Temperature - Mensagem de resposta >>> %s\n", sliced_T_msg_recebida);
+			printf("Temperature - Mensagem de resposta >>> %s\n", temperature);
 			printf("Na - Mensagem de resposta >>> %s\n", Na_msg_recebida);
 			printf("Reference error >>> %f\n", error);
-			printf("Response time: %ld \n", response_time);
+			printf("Response time: %ld ns\n", response_time);
 
 			small_loop_count = 0;
 		}
