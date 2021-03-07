@@ -1,25 +1,23 @@
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 
-void slice_str(const char * str, char * buffer, size_t start, size_t end)
+int main()
 {
-  size_t j = 0;
-  for ( size_t i = start; i <= end; ++i ) {
-    buffer[j++] = str[i];
-  }
-  buffer[j] = 0;
-}
+   int num = 124235;
+   FILE *fptr;
 
-int main(void) {
-  const char str[] = "Polly";
-  const size_t len = strlen(str);
-  char buffer[len + 1];
+   // use appropriate location if you are using MacOS or Linux
+   fptr = fopen("test.csv","w");
 
-  slice_str(str, buffer, 0, len);
-  printf("%s\n", buffer);
+   if(fptr == NULL)
+   {
+      printf("Error!");   
+      exit(1);             
+   }
 
-  printf("%ld\n", sizeof(str)/sizeof(str[0]));
-  printf("%ld\n", sizeof(buffer)/sizeof(buffer[0]));
+   fprintf(fptr,"%d\n",num);
+   fprintf(fptr,"%d\n",num);
+   fclose(fptr);
 
-  return 0;
+   return 0;
 }

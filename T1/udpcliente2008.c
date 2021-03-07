@@ -212,20 +212,30 @@ int main(int argc, char *argv[])
 
 	// Message
 	int TAM_BUFFER = 1000;    
-  char temperature[TAM_BUFFER + 1];
+  	char temperature[TAM_BUFFER + 1];
 
 	float ref = atof(argv[3]);
 	float error;
 
 	// Time
 	struct timespec t0, t1;
-  const int small_interval = 250000000;
-  const int big_interval = 500000000; /* 1000ms*/
-  const int small_intervals_in_big_interval = big_interval / small_interval; /* 1000ms*/
-  int small_loop_count = 0; /* 1000ms*/
+	const int small_interval = 30000000;
+	const int big_interval = 500000000; /* 1000ms*/
+	const int small_intervals_in_big_interval = big_interval / small_interval; /* 1000ms*/
+	int small_loop_count = 0; /* 1000ms*/
 	long response_time;
-  clock_gettime(CLOCK_MONOTONIC ,&t0);
-  t0.tv_sec++; // start after one second
+	clock_gettime(CLOCK_MONOTONIC ,&t0);
+	t0.tv_sec++; // start after one second
+
+	// File
+	FILE *output_file;
+
+	output_file = fopen("response_times.csv", "w");
+	
+	if(output_file == NULL) {
+        printf("File couldn't be opened\n");
+        exit(1);
+    }
 
 	struct controller_setup Na_controller_setup = {
 		"ana",
@@ -260,9 +270,10 @@ int main(int argc, char *argv[])
 	Ni_controller_setup.kp = 0.45 * Ni_controller_setup.ku;
 	Ni_controller_setup.ki = 1.2 * Ni_controller_setup.kp / Ni_controller_setup.pu;
 
-  while(1) {
-    /* wait until next shot */
-    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
+	int number_of_loops = 0;
+	while(number_of_loops <= 20000) {
+		/* wait until next shot */
+		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
 		read_and_parse_temperature(socket_local, endereco_destino, temperature, TAM_BUFFER);
 
@@ -274,14 +285,17 @@ int main(int argc, char *argv[])
 
 		response_time = (t1.tv_sec - t0.tv_sec) * NSEC_PER_SEC + (t1.tv_nsec - t0.tv_nsec);
 
+		fprintf(output_file,"%ld\n", response_time);
+
 		t0.tv_nsec += small_interval;
 
-    while (t0.tv_nsec >= NSEC_PER_SEC) {
-      t0.tv_nsec -= NSEC_PER_SEC;
-      t0.tv_sec++;
-    }
+		while (t0.tv_nsec >= NSEC_PER_SEC) {
+			t0.tv_nsec -= NSEC_PER_SEC;
+			t0.tv_sec++;
+		}
 
 		small_loop_count++;
+		number_of_loops++;
 
 		// printf("count %d\n", small_loop_count);
 
@@ -298,4 +312,5 @@ int main(int argc, char *argv[])
 			small_loop_count = 0;
 		}
 	}
+	fclose(output_file);
 }
