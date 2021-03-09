@@ -1,3 +1,6 @@
+// David Steiner Sand
+// 17100655
+
 /*  Programa de demonstração de uso de sockets UDP em C no Linux
  *  Funcionamento:
  *  O programa cliente envia uma msg para o servidor. Essa msg é uma palavra.
@@ -179,18 +182,18 @@ float controller(
 	send_request(socket_local, endereco_destino, cs->control_action_str_parsed, cs->control_received_message, TAM_BUFFER);
 }
 
-float read_and_parse_temperature(
+float read_and_parse(
 	int socket_local,
 	struct sockaddr_in endereco_destino,
-	char *temperature,
+	char *read_from_prefix,
+	char *read_from,
 	int TAM_BUFFER
 ){
-	char T_msg_recebida[TAM_BUFFER];
-	char temperature_prefix[] = "st-0";
-	const size_t temperature_prefix_size = strlen(temperature_prefix);
+	char msg_recebida[TAM_BUFFER];
+	const size_t read_from_prefix_size = strlen(read_from_prefix);
 
-	send_request(socket_local, endereco_destino, "st-0", T_msg_recebida, TAM_BUFFER);
-	slice_str(T_msg_recebida, temperature, temperature_prefix_size - 1, TAM_BUFFER);
+	send_request(socket_local, endereco_destino, read_from_prefix, msg_recebida, TAM_BUFFER);
+	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
 int main(int argc, char *argv[])
@@ -213,19 +216,18 @@ int main(int argc, char *argv[])
 	// Message
 	int TAM_BUFFER = 1000;    
   	char temperature[TAM_BUFFER + 1];
+  	char Ti[TAM_BUFFER + 1];
 
 	float ref = atof(argv[3]);
 	float error;
 
 	// Time
 	struct timespec t0, t1;
-	const int small_interval = 30000000;
-	const int big_interval = 500000000; /* 1000ms*/
-	const int small_intervals_in_big_interval = big_interval / small_interval; /* 1000ms*/
-	int small_loop_count = 0; /* 1000ms*/
+	const int small_interval = 30000000; // 30ms
+	const int big_interval = 500000000; // 500ms
+	const int small_intervals_in_big_interval = big_interval / small_interval;
+	int small_loop_count = 0;
 	long response_time;
-	clock_gettime(CLOCK_MONOTONIC ,&t0);
-	t0.tv_sec++; // start after one second
 
 	// File
 	FILE *output_file;
@@ -236,6 +238,8 @@ int main(int argc, char *argv[])
         printf("File couldn't be opened\n");
         exit(1);
     }
+
+	// Define controladores
 
 	struct controller_setup Na_controller_setup = {
 		"ana",
@@ -271,20 +275,33 @@ int main(int argc, char *argv[])
 	Ni_controller_setup.ki = 1.2 * Ni_controller_setup.kp / Ni_controller_setup.pu;
 
 	int number_of_loops = 0;
-	while(number_of_loops <= 20000) {
-		/* wait until next shot */
+	clock_gettime(CLOCK_MONOTONIC ,&t0);
+	// while (number_of_loops <= 20000) {
+	while (1) {
+
+		// Espera ate proximo periodo
 		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
 
-		read_and_parse_temperature(socket_local, endereco_destino, temperature, TAM_BUFFER);
+		// Leitura dos sensores
+		read_and_parse(socket_local, endereco_destino, "st-0", temperature, TAM_BUFFER);
+		read_and_parse(socket_local, endereco_destino, "sti0", Ti, TAM_BUFFER);
 
+		// Controladores
 		controller(&Na_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 		controller(&Q_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-		controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 
+		if (atof(Ti) < atof(temperature)) {
+			controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		}
+		else {
+			send_request(socket_local, endereco_destino, "ani0", Ni_controller_setup.control_received_message, TAM_BUFFER);
+		}
+
+		// Tempo de resposta
 		clock_gettime(CLOCK_MONOTONIC, &t1);
-
 		response_time = (t1.tv_sec - t0.tv_sec) * NSEC_PER_SEC + (t1.tv_nsec - t0.tv_nsec);
 
+		// Exporta tempo de resposta
 		fprintf(output_file,"%ld\n", response_time);
 
 		t0.tv_nsec += small_interval;
@@ -297,8 +314,7 @@ int main(int argc, char *argv[])
 		small_loop_count++;
 		number_of_loops++;
 
-		// printf("count %d\n", small_loop_count);
-
+		// Inteface usuario
 		if (small_loop_count >= small_intervals_in_big_interval){
 			printf("\n\n\n\n");
 			printf("Reference >>>>>>>> %f <<<<<<<<\n\n", ref);
@@ -306,6 +322,7 @@ int main(int argc, char *argv[])
 			printf("Na - Mensagem de resposta >>> %s\n", Na_controller_setup.control_received_message);
 			printf("Q - Mensagem de resposta >>> %s\n", Q_controller_setup.control_received_message);
 			printf("Ni - Mensagem de resposta >>> %s\n", Ni_controller_setup.control_received_message);
+			printf("Ti - Mensagem de resposta >>> %s\n", Ti);
 			printf("Reference error >>> %f\n", error);
 			printf("Response time >>> %ld ns\n", response_time);
 
