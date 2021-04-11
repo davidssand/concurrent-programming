@@ -218,10 +218,12 @@ int main(int argc, char *argv[])
   	char temperature[TAM_BUFFER + 1];
   	char height[TAM_BUFFER + 1];
   	char Ti[TAM_BUFFER + 1];
+  	char state[7] = "OK";
 
 	float temperature_ref = atof(argv[3]);
 	float height_ref = atof(argv[4]);
 	
+	float alarming_temperature = 30;
 	float temperature_error;
 	float height_error;
 
@@ -303,11 +305,15 @@ int main(int argc, char *argv[])
 		read_and_parse(socket_local, endereco_destino, "sti0", Ti, TAM_BUFFER);
 
 		// Controladores
-		controller(&Nf_controller_setup, &temperature_error, temperature_ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		controller(&Na_controller_setup, &temperature_error, temperature_ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 		controller(&Q_controller_setup, &temperature_error, temperature_ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 
 		controller(&Ni_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 		controller(&Nf_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+
+		if (atof(temperature) > alarming_temperature) {
+			strcpy(state, "ALARME");
+		}
 
 		// if (atof(Ti) < atof(temperature)) {
 		// 	controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
@@ -336,15 +342,15 @@ int main(int argc, char *argv[])
 		// Inteface usuario
 		if (small_loop_count >= small_intervals_in_big_interval){
 			printf("\n\n\n\n");
+			printf("State                      <<< %s >>>\n\n", state);
+			
 			printf("Temperature reference      >>> %f <<<\n", temperature_ref);
 			printf("Temperature                --- %s\n", temperature);
-			printf("Reference error            --- %f\n", temperature_error);
 			printf("Q                          --- %s\n", Q_controller_setup.control_received_message);
 			printf("Na                         --- %s\n\n", Na_controller_setup.control_received_message);
 			
 			printf("Height reference           >>> %f <<<\n", height_ref);
 			printf("Height                     --- %s\n", height);
-			printf("Reference error            --- %f\n", height_error);
 			printf("Ti                         --- %s\n", Ti);
 			printf("Ni                         --- %s\n", Ni_controller_setup.control_received_message);
 			printf("Nf                         --- %s\n\n", Nf_controller_setup.control_received_message);
