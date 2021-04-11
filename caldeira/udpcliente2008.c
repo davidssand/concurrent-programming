@@ -196,23 +196,31 @@ float read_and_parse(
 	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
-void* check_for_user_inputs() {
-	float a;
-	while (1) {
-		// Taking multiple inputs
-		scanf("%f", &a);
+float temperature_ref = 20;
+float height_ref = 2;
 
-		printf(" %f\n", a);
+void check_for_user_inputs() {
+	float a;
+	float b;
+	// Taking multiple inputs
+	scanf("%f%f", &a, &b);
+
+	temperature_ref = a;
+	height_ref = b;
+}
+
+void* inputs_thread_function() {
+	while (1) {
+		check_for_user_inputs();
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	if (argc < 4) { 
+	if (argc < 3) { 
 		fprintf(stderr,"Uso: udpcliente endereço porta palavra \n");
 		fprintf(stderr,"onde o endereço é o endereço do servidor \n");
 		fprintf(stderr,"porta é o número da porta do servidor \n");
-		fprintf(stderr,"palavra é a palavra que será enviada ao servidor \n");
 		fprintf(stderr,"exemplo de uso:\n");
 		fprintf(stderr,"   udpcliente baker.das.ufsc.br 1234 \"ola\"\n");
 		exit(FALHA);
@@ -222,9 +230,8 @@ int main(int argc, char *argv[])
 
 	pthread_t inputs_thread;
 	pthread_attr_t inputs_thread_attr;
-	pthread_attr_init(&inputs_thread_attr);
 
-	pthread_create(&inputs_thread, &inputs_thread_attr, check_for_user_inputs, &limit);
+	pthread_create(&inputs_thread, &inputs_thread_attr, inputs_thread_function, &limit);
 
 	// Socket
 	int porta_destino = atoi( argv[2]);
@@ -238,9 +245,6 @@ int main(int argc, char *argv[])
   	char Ti[TAM_BUFFER + 1];
   	char state[7] = "OK";
 
-	float temperature_ref = atof(argv[3]);
-	float height_ref = atof(argv[4]);
-	
 	float alarming_temperature = 30;
 	float temperature_error;
 	float height_error;
@@ -375,7 +379,8 @@ int main(int argc, char *argv[])
 
 			printf("Response time              --- %ld ns\n\n", response_time);
 
-    		printf("Enter integer and then a float: \n");
+    		printf("To change references: \n");
+    		printf("Temperature reference + Enter + Height reference + Enter\n");
 
 			small_loop_count = 0;
 		}
