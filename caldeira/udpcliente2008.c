@@ -219,8 +219,11 @@ int main(int argc, char *argv[])
   	char height[TAM_BUFFER + 1];
   	char Ti[TAM_BUFFER + 1];
 
-	float ref = atof(argv[3]);
-	float error;
+	float temperature_ref = atof(argv[3]);
+	float height_ref = atof(argv[4]);
+	
+	float temperature_error;
+	float height_error;
 
 	// Time
 	struct timespec t0, t1;
@@ -268,8 +271,8 @@ int main(int argc, char *argv[])
 		"ani",
 		100.0,
 		0.0,
-		-500.0,
-		0.5,
+		1000.0,
+		0.1,
 		TAM_BUFFER,
 	};
 	Ni_controller_setup.kp = 0.45 * Ni_controller_setup.ku;
@@ -279,8 +282,8 @@ int main(int argc, char *argv[])
 		"anf",
 		100.0,
 		0.0,
-		-500.0,
-		0.5,
+		-1000.0,
+		0.1,
 		TAM_BUFFER,
 	};
 	Nf_controller_setup.kp = 0.45 * Nf_controller_setup.ku;
@@ -300,8 +303,11 @@ int main(int argc, char *argv[])
 		read_and_parse(socket_local, endereco_destino, "sti0", Ti, TAM_BUFFER);
 
 		// Controladores
-		controller(&Na_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-		controller(&Q_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		controller(&Nf_controller_setup, &temperature_error, temperature_ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		controller(&Q_controller_setup, &temperature_error, temperature_ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+
+		controller(&Ni_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		controller(&Nf_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 
 		// if (atof(Ti) < atof(temperature)) {
 		// 	controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
@@ -330,15 +336,20 @@ int main(int argc, char *argv[])
 		// Inteface usuario
 		if (small_loop_count >= small_intervals_in_big_interval){
 			printf("\n\n\n\n");
-			printf("Reference >>>>>>>> %f <<<<<<<<\n\n", ref);
-			printf("Temperature - Mensagem de resposta >>> %s\n", temperature);
-			printf("Height - Mensagem de resposta >>> %s\n", height);
-			printf("Ti - Mensagem de resposta >>> %s\n", Ti);
-			printf("Na - Mensagem de resposta >>> %s\n", Na_controller_setup.control_received_message);
-			printf("Q - Mensagem de resposta >>> %s\n", Q_controller_setup.control_received_message);
-			printf("Ni - Mensagem de resposta >>> %s\n", Ni_controller_setup.control_received_message);
-			printf("Reference error >>> %f\n", error);
-			printf("Response time >>> %ld ns\n", response_time);
+			printf("Temperature reference      >>> %f <<<\n", temperature_ref);
+			printf("Temperature                --- %s\n", temperature);
+			printf("Reference error            --- %f\n", temperature_error);
+			printf("Q                          --- %s\n", Q_controller_setup.control_received_message);
+			printf("Na                         --- %s\n\n", Na_controller_setup.control_received_message);
+			
+			printf("Height reference           >>> %f <<<\n", height_ref);
+			printf("Height                     --- %s\n", height);
+			printf("Reference error            --- %f\n", height_error);
+			printf("Ti                         --- %s\n", Ti);
+			printf("Ni                         --- %s\n", Ni_controller_setup.control_received_message);
+			printf("Nf                         --- %s\n\n", Nf_controller_setup.control_received_message);
+
+			printf("Response time              --- %ld ns\n", response_time);
 
 			small_loop_count = 0;
 		}
