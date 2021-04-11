@@ -131,7 +131,7 @@ float controller(
 	struct controller_setup *cs,
 	float *error_pointer,
 	float ref,
-	char *temperature,
+	char *controlled_variable,
 	int socket_local,
 	struct sockaddr_in endereco_destino,
 	const int small_interval,
@@ -148,7 +148,7 @@ float controller(
 	float error;
 	
 	// Calculate error
-	error = ref - atof(temperature);
+	error = ref - atof(controlled_variable);
 	*error_pointer = error;
 
 	// Controller
@@ -216,6 +216,7 @@ int main(int argc, char *argv[])
 	// Message
 	int TAM_BUFFER = 1000;    
   	char temperature[TAM_BUFFER + 1];
+  	char height[TAM_BUFFER + 1];
   	char Ti[TAM_BUFFER + 1];
 
 	float ref = atof(argv[3]);
@@ -274,6 +275,17 @@ int main(int argc, char *argv[])
 	Ni_controller_setup.kp = 0.45 * Ni_controller_setup.ku;
 	Ni_controller_setup.ki = 1.2 * Ni_controller_setup.kp / Ni_controller_setup.pu;
 
+	struct controller_setup Nf_controller_setup = {
+		"anf",
+		100.0,
+		0.0,
+		-500.0,
+		0.5,
+		TAM_BUFFER,
+	};
+	Nf_controller_setup.kp = 0.45 * Nf_controller_setup.ku;
+	Nf_controller_setup.ki = 1.2 * Nf_controller_setup.kp / Nf_controller_setup.pu;
+
 	int number_of_loops = 0;
 	clock_gettime(CLOCK_MONOTONIC ,&t0);
 	// while (number_of_loops <= 20000) {
@@ -284,18 +296,19 @@ int main(int argc, char *argv[])
 
 		// Leitura dos sensores
 		read_and_parse(socket_local, endereco_destino, "st-0", temperature, TAM_BUFFER);
+		read_and_parse(socket_local, endereco_destino, "sh-0", height, TAM_BUFFER);
 		read_and_parse(socket_local, endereco_destino, "sti0", Ti, TAM_BUFFER);
 
 		// Controladores
 		controller(&Na_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 		controller(&Q_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 
-		if (atof(Ti) < atof(temperature)) {
-			controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-		}
-		else {
-			send_request(socket_local, endereco_destino, "ani0", Ni_controller_setup.control_received_message, TAM_BUFFER);
-		}
+		// if (atof(Ti) < atof(temperature)) {
+		// 	controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
+		// }
+		// else {
+		// 	send_request(socket_local, endereco_destino, "ani0", Ni_controller_setup.control_received_message, TAM_BUFFER);
+		// }
 
 		// Tempo de resposta
 		clock_gettime(CLOCK_MONOTONIC, &t1);
@@ -319,10 +332,11 @@ int main(int argc, char *argv[])
 			printf("\n\n\n\n");
 			printf("Reference >>>>>>>> %f <<<<<<<<\n\n", ref);
 			printf("Temperature - Mensagem de resposta >>> %s\n", temperature);
+			printf("Height - Mensagem de resposta >>> %s\n", height);
+			printf("Ti - Mensagem de resposta >>> %s\n", Ti);
 			printf("Na - Mensagem de resposta >>> %s\n", Na_controller_setup.control_received_message);
 			printf("Q - Mensagem de resposta >>> %s\n", Q_controller_setup.control_received_message);
 			printf("Ni - Mensagem de resposta >>> %s\n", Ni_controller_setup.control_received_message);
-			printf("Ti - Mensagem de resposta >>> %s\n", Ti);
 			printf("Reference error >>> %f\n", error);
 			printf("Response time >>> %ld ns\n", response_time);
 
