@@ -121,13 +121,17 @@ Alguns aspectos para a composição da nota do trabalho do controlador:
 
 
 T3 – Programação Concorrente
-Implemente uma simulação usando programação concorrente, onde os elementos ativos (pessoas, carros, máquinas, etc) são representados por threads, e os elementos passivos usados por eles (elevador, cruzamento, peças, etc) são representados por monitores acessados pelas threads.
+Implemente uma simulação usando programação concorrente, onde os elementos ativos (pessoas, carros, máquinas, etc) são representados por threads,
+e os elementos passivos usados por eles (elevador, cruzamento, peças, etc) são representados por monitores acessados pelas threads.
 
-A simulação será construida como um programa concorrente em C usando a biblioteca das pthreads. Os elementos ativos são representados por threads, e a descrição do ambiente onde ocorre a interação entre eles deve ser feita através de variáveis globais compartilhadas, cujo acesso é regulado por monitores. A evolução do estado do sistema ocorre conforme a dinâmica do sistema simulado. Sleep pode ser usado para simular ações demoradas.
+A simulação será construida como um programa concorrente em C usando a biblioteca das pthreads. Os elementos ativos são representados por threads,
+e a descrição do ambiente onde ocorre a interação entre eles deve ser feita através de variáveis globais compartilhadas, cujo acesso é regulado por monitores. A evolução do estado do sistema ocorre conforme a dinâmica do sistema simulado. Sleep pode ser usado para simular ações demoradas.
 
-Exemplos de sistemas que podem ser simulados: tráfego urbano, tráfego aéreo, tráfego ferroviário, manufatura, bolsa de valores, sistemas militares, sistemas ecológicos, etc.
+Exemplos de sistemas que podem ser simulados: tráfego urbano, tráfego aéreo, tráfego ferroviário, manufatura, bolsa de valores, 
+sistemas militares, sistemas ecológicos, etc.
 
 Cada grupo deve descrever sua proposta e obter aprovação para ela antes de implementar. Cada grupo deve implementar uma simulação diferente.
 
-A simulação será realizada por um programa único composto por muitas threads. O uso de comunicação via UDP é opcional, não será cobrado. Mas pode ser usado caso o grupo julgue conveniente para a simulação em questão.
+A simulação será realizada por um programa único composto por muitas threads. O uso de comunicação via UDP é opcional, não será cobrado.
+Mas pode ser usado caso o grupo julgue conveniente para a simulação em questão.
 

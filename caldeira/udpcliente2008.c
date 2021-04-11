@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <netdb.h>
-
+#include <pthread.h>
 #include <time.h>
 
 #define NSEC_PER_SEC (1000000000) /* The number of nsecs per sec. */
@@ -196,6 +196,16 @@ float read_and_parse(
 	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
+void* check_for_user_inputs() {
+	float a;
+	while (1) {
+		// Taking multiple inputs
+		scanf("%f", &a);
+
+		printf(" %f\n", a);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 4) { 
@@ -207,6 +217,14 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"   udpcliente baker.das.ufsc.br 1234 \"ola\"\n");
 		exit(FALHA);
 	}
+
+	long long limit = 1;
+
+	pthread_t inputs_thread;
+	pthread_attr_t inputs_thread_attr;
+	pthread_attr_init(&inputs_thread_attr);
+
+	pthread_create(&inputs_thread, &inputs_thread_attr, check_for_user_inputs, &limit);
 
 	// Socket
 	int porta_destino = atoi( argv[2]);
@@ -273,7 +291,7 @@ int main(int argc, char *argv[])
 		"ani",
 		100.0,
 		0.0,
-		1000.0,
+		500.0,
 		0.1,
 		TAM_BUFFER,
 	};
@@ -284,7 +302,7 @@ int main(int argc, char *argv[])
 		"anf",
 		100.0,
 		0.0,
-		-1000.0,
+		-500.0,
 		0.1,
 		TAM_BUFFER,
 	};
@@ -355,7 +373,9 @@ int main(int argc, char *argv[])
 			printf("Ni                         --- %s\n", Ni_controller_setup.control_received_message);
 			printf("Nf                         --- %s\n\n", Nf_controller_setup.control_received_message);
 
-			printf("Response time              --- %ld ns\n", response_time);
+			printf("Response time              --- %ld ns\n\n", response_time);
+
+    		printf("Enter integer and then a float: \n");
 
 			small_loop_count = 0;
 		}
