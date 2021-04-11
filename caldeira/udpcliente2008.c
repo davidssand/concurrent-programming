@@ -196,6 +196,7 @@ float read_and_parse(
 	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
+// pthread_mutex_t mutex PTHREAD_MUTEX_INITIALIZER;
 float temperature_ref = 20;
 float height_ref = 2;
 
@@ -209,10 +210,15 @@ void check_for_user_inputs() {
 	height_ref = b;
 }
 
-void* inputs_thread_function() {
+void *inputs_thread_function(void *args) {
 	while (1) {
 		check_for_user_inputs();
 	}
+	pthread_exit(NULL);
+}
+
+void *alarm_thread_function(void *args) {
+
 }
 
 int main(int argc, char *argv[])
@@ -226,12 +232,13 @@ int main(int argc, char *argv[])
 		exit(FALHA);
 	}
 
-	long long limit = 1;
-
 	pthread_t inputs_thread;
-	pthread_attr_t inputs_thread_attr;
+	// pthread_attr_t inputs_thread_attr;
+	// pthread_attr_init(&inputs_thread_attr);
+	pthread_create(&inputs_thread, NULL, inputs_thread_function, NULL);
 
-	pthread_create(&inputs_thread, &inputs_thread_attr, inputs_thread_function, &limit);
+	// pthread_t alarm_thread;
+	// pthread_create(&alarm_thread, NULL, alarm_thread_function, NULL);
 
 	// Socket
 	int porta_destino = atoi( argv[2]);
