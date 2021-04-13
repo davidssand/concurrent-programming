@@ -49,6 +49,16 @@ struct controller_setup {
 	char control_received_message[1000];
 };
 
+struct state_info {
+	char *state;
+	char *temperature;
+};
+
+// pthread_mutex_t mutex PTHREAD_MUTEX_INITIALIZER;
+float temperature_ref = 20;
+float height_ref = 2;
+
+
 int cria_socket_local(void)
 {
 	int socket_local;		/* Socket usado na comunicacão */
@@ -196,10 +206,6 @@ float read_and_parse(
 	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
-// pthread_mutex_t mutex PTHREAD_MUTEX_INITIALIZER;
-float temperature_ref = 20;
-float height_ref = 2;
-
 void check_for_user_inputs() {
 	float a;
 	float b;
@@ -214,11 +220,27 @@ void *inputs_thread_function(void *args) {
 	while (1) {
 		check_for_user_inputs();
 	}
+	// Not needed, just to keep it safe for the future
+	pthread_exit(NULL);
+
+}
+
+void handle_alarm(struct state_info *alarm_info) {
+	float alarming_temperature = 38;
+	while (1) {
+		if (atof(alarm_info->temperature) > alarming_temperature) {
+			strcpy(alarm_info->state, "ALARME");
+		} else {
+			strcpy(alarm_info->state, "OK");
+		}
+	}
+	// Not needed, just to keep it safe for the future
 	pthread_exit(NULL);
 }
 
-void *alarm_thread_function(void *args) {
-
+void *alarm_thread_function(void *received_struct) {
+	// struct state_info *alarm_info = (struct state_info*) received_struct;
+	handle_alarm(received_struct);
 }
 
 int main(int argc, char *argv[])
@@ -231,15 +253,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"   udpcliente baker.das.ufsc.br 1234 \"ola\"\n");
 		exit(FALHA);
 	}
-
-	pthread_t inputs_thread;
-	// pthread_attr_t inputs_thread_attr;
-	// pthread_attr_init(&inputs_thread_attr);
-	pthread_create(&inputs_thread, NULL, inputs_thread_function, NULL);
-
-	// pthread_t alarm_thread;
-	// pthread_create(&alarm_thread, NULL, alarm_thread_function, NULL);
-
 	// Socket
 	int porta_destino = atoi( argv[2]);
 	int socket_local = cria_socket_local();
@@ -252,7 +265,6 @@ int main(int argc, char *argv[])
   	char Ti[TAM_BUFFER + 1];
   	char state[7] = "OK";
 
-	float alarming_temperature = 30;
 	float temperature_error;
 	float height_error;
 
@@ -320,6 +332,19 @@ int main(int argc, char *argv[])
 	Nf_controller_setup.kp = 0.45 * Nf_controller_setup.ku;
 	Nf_controller_setup.ki = 1.2 * Nf_controller_setup.kp / Nf_controller_setup.pu;
 
+	pthread_t inputs_thread;
+	pthread_create(&inputs_thread, NULL, inputs_thread_function, NULL);
+
+	struct state_info alarm_info = {
+		state,
+		temperature,
+	};
+
+	pthread_t alarm_thread;
+	pthread_attr_t alarm_thread_attr;
+	pthread_attr_init(&alarm_thread_attr);
+	pthread_create(&alarm_thread, &alarm_thread_attr, alarm_thread_function, &alarm_info);
+
 	int number_of_loops = 0;
 	clock_gettime(CLOCK_MONOTONIC ,&t0);
 	// while (number_of_loops <= 20000) {
@@ -339,10 +364,6 @@ int main(int argc, char *argv[])
 
 		controller(&Ni_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
 		controller(&Nf_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-
-		if (atof(temperature) > alarming_temperature) {
-			strcpy(state, "ALARME");
-		}
 
 		// if (atof(Ti) < atof(temperature)) {
 		// 	controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
@@ -371,7 +392,7 @@ int main(int argc, char *argv[])
 		// Inteface usuario
 		if (small_loop_count >= small_intervals_in_big_interval){
 			printf("\n\n\n\n");
-			printf("State                      <<< %s >>>\n\n", state);
+			printf("State                      <<< %s >>>\n\n", alarm_info.state);
 			
 			printf("Temperature reference      >>> %f <<<\n", temperature_ref);
 			printf("Temperature                --- %s\n", temperature);
