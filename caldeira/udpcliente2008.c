@@ -61,9 +61,11 @@ float height_ref = 2;
 
 struct control_info {
 	char *prefix;
-	struct controller_setup *controllers_setups;
+	struct controller_setup *controller_setup1;
+	struct controller_setup *controller_setup2;
 	float *error;
 	float *ref;
+	char *Ti;
 	char *controlled_variable;
 	int socket_local;
 	struct sockaddr_in endereco_destino;
@@ -256,7 +258,6 @@ void *alarm_thread_function(void *received_struct) {
 }
 
 void control_function(struct control_info *control_info_struct) {
-	printf("In control function\n");
 	struct timespec t0, t1;
 	clock_gettime(CLOCK_MONOTONIC ,&t0);
 	long response_time;
@@ -285,9 +286,27 @@ void control_function(struct control_info *control_info_struct) {
 			control_info_struct->TAM_BUFFER
 		);
 
-		// Controladores
+		read_and_parse(
+			control_info_struct->socket_local,
+			control_info_struct->endereco_destino,
+			"sti0",
+			control_info_struct->Ti,
+			control_info_struct->TAM_BUFFER
+		);
+
 		controller(
-			control_info_struct->controllers_setups,
+			control_info_struct->controller_setup1,
+			control_info_struct->error,
+			control_info_struct->ref,
+			control_info_struct->controlled_variable,
+			control_info_struct->socket_local,
+			control_info_struct->endereco_destino,
+			control_info_struct->small_interval,
+			control_info_struct->TAM_BUFFER
+		);
+
+		controller(
+			control_info_struct->controller_setup2,
 			control_info_struct->error,
 			control_info_struct->ref,
 			control_info_struct->controlled_variable,
@@ -334,7 +353,7 @@ int main(int argc, char *argv[])
 	struct sockaddr_in endereco_destino = cria_endereco_destino(argv[1], porta_destino);
 
 	// Message
-	int TAM_BUFFER = 1000;    
+	int TAM_BUFFER = 10000;    
   	char temperature[TAM_BUFFER + 1];
   	char height[TAM_BUFFER + 1];
   	char Ti[TAM_BUFFER + 1];
@@ -397,9 +416,11 @@ int main(int argc, char *argv[])
 
 	struct control_info temperature_control_info = {
 		.prefix = "st-0",
-		.controllers_setups = &Na_controller_setup,
+		.controller_setup1 = &Na_controller_setup,
+		.controller_setup2 = &Q_controller_setup,
 		.error = &temperature_error,
 		.ref = &temperature_ref,
+		.Ti = Ti,
 		.controlled_variable = temperature,
 		.socket_local = socket_local,
 		.endereco_destino = endereco_destino,
@@ -409,9 +430,11 @@ int main(int argc, char *argv[])
 
 	struct control_info height_control_info = {
 		.prefix = "sh-0",
-		.controllers_setups = &Ni_controller_setup,
+		.controller_setup1 = &Ni_controller_setup,
+		.controller_setup2 = &Nf_controller_setup,
 		.error = &height_error,
 		.ref = &height_ref,
+		.Ti = Ti,
 		.controlled_variable = height,
 		.socket_local = socket_local,
 		.endereco_destino = endereco_destino,
@@ -424,19 +447,24 @@ int main(int argc, char *argv[])
 		temperature,
 	};
 
-	// pthread_attr_t alarm_thread_attr;
-	// pthread_attr_init(&alarm_thread_attr);
+
 	pthread_t inputs_thread;
 	pthread_create(&inputs_thread, NULL, inputs_thread_function, NULL);
 	
 	pthread_t alarm_thread;
-	pthread_create(&alarm_thread, NULL, alarm_thread_function, &alarm_info);
+	pthread_attr_t alarm_thread_attr;
+	pthread_attr_init(&alarm_thread_attr);
+	pthread_create(&alarm_thread, &alarm_thread_attr, alarm_thread_function, &alarm_info);
 
 	pthread_t temperature_control_thread;
-	pthread_create(&temperature_control_thread, NULL, control_thread_function, &temperature_control_info);
+	pthread_attr_t temperature_control_thread_attr;
+	pthread_attr_init(&temperature_control_thread_attr);
+	pthread_create(&temperature_control_thread, &temperature_control_thread_attr, control_thread_function, &temperature_control_info);
 
 	pthread_t height_control_thread;
-	pthread_create(&height_control_thread, NULL, control_thread_function, &height_control_info);
+	pthread_attr_t height_control_thread_attr;
+	pthread_attr_init(&height_control_thread_attr);
+	pthread_create(&height_control_thread, &height_control_thread_attr, control_thread_function, &height_control_info);
 
 	while(1) {
 		// Inteface usuario
@@ -450,14 +478,15 @@ int main(int argc, char *argv[])
 		
 		printf("Height reference           >>> %f <<<\n", height_ref);
 		printf("Height                     --- %s\n", height);
-		printf("Ti                         --- %s\n", Ti);
 		printf("Ni                         --- %s\n", Ni_controller_setup.control_received_message);
 		printf("Nf                         --- %s\n\n", Nf_controller_setup.control_received_message);
+
+		printf("Ti                         --- %s\n\n", Ti);
 
 		// printf("Response time              --- %ld ns\n\n", response_time);
 
 		printf("To change references: \n");
 		printf("Temperature reference + Enter + Height reference + Enter\n");
-		sleep(1);
+		usleep(500000);
 	}
 }
