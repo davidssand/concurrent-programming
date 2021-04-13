@@ -344,7 +344,8 @@ int main(int argc, char *argv[])
 	float height_error;
 
 	// Time
-	const int small_interval = 30000000; // 30ms
+	const int temperature_small_interval = 50000000; // 30ms
+	const int height_small_interval = 70000000; // 30ms
 
 	// Define controladores
 
@@ -402,7 +403,7 @@ int main(int argc, char *argv[])
 		.controlled_variable = temperature,
 		.socket_local = socket_local,
 		.endereco_destino = endereco_destino,
-		.small_interval = small_interval,
+		.small_interval = temperature_small_interval,
 		.TAM_BUFFER = TAM_BUFFER,
 	};
 
@@ -414,7 +415,7 @@ int main(int argc, char *argv[])
 		.controlled_variable = height,
 		.socket_local = socket_local,
 		.endereco_destino = endereco_destino,
-		.small_interval = small_interval,
+		.small_interval = height_small_interval,
 		.TAM_BUFFER = TAM_BUFFER,
 	};
 
