@@ -64,7 +64,7 @@ struct control_info {
 	struct controller_setup *controllers_setups;
 	float *error;
 	float *ref;
-	char *controled_variable;
+	char *controlled_variable;
 	int socket_local;
 	struct sockaddr_in endereco_destino;
 	const int small_interval;
@@ -281,7 +281,7 @@ void control_function(struct control_info *control_info_struct) {
 			control_info_struct->socket_local,
 			control_info_struct->endereco_destino,
 			control_info_struct->prefix,
-			control_info_struct->controled_variable,
+			control_info_struct->controlled_variable,
 			control_info_struct->TAM_BUFFER
 		);
 
@@ -290,23 +290,12 @@ void control_function(struct control_info *control_info_struct) {
 			control_info_struct->controllers_setups,
 			control_info_struct->error,
 			control_info_struct->ref,
-			control_info_struct->controled_variable,
+			control_info_struct->controlled_variable,
 			control_info_struct->socket_local,
 			control_info_struct->endereco_destino,
 			control_info_struct->small_interval,
 			control_info_struct->TAM_BUFFER
 		);
-		// controller(&Q_controller_setup, &temperature_error, control_info_struct->ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-
-		// controller(&Ni_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-		// controller(&Nf_controller_setup, &height_error, height_ref, height, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-
-		// if (atof(Ti) < atof(temperature)) {
-		// 	controller(&Ni_controller_setup, &error, ref, temperature, socket_local, endereco_destino, small_interval, TAM_BUFFER);
-		// }
-		// else {
-		// 	send_request(socket_local, endereco_destino, "ani0", Ni_controller_setup.control_received_message, TAM_BUFFER);
-		// }
 
 		// Tempo de resposta
 		clock_gettime(CLOCK_MONOTONIC, &t1);
@@ -360,72 +349,74 @@ int main(int argc, char *argv[])
 	// Define controladores
 
 	struct controller_setup Na_controller_setup = {
-		"ana",
-		10.0,
-		0.0,
-		500.0,
-		0.5,
-		TAM_BUFFER,
+		.prefix = "ana",
+		.overflow = 10.0,
+		.underflow = 0.0,
+		.ku = 500.0,
+		.pu = 0.5,
+		.TAM_BUFFER = TAM_BUFFER,
 	};
 	Na_controller_setup.kp = 0.45 * Na_controller_setup.ku;
 	Na_controller_setup.ki = 1.2 * Na_controller_setup.kp / Na_controller_setup.pu;
 
 	struct controller_setup Q_controller_setup = {
-		"aq-",
-		1000000.0,
-		0.0,
-		10000000.0,
-		0.5,
-		TAM_BUFFER,
+		.prefix = "aq-",
+		.overflow = 1000000.0,
+		.underflow = 0.0,
+		.ku = 10000000.0,
+		.pu = 0.5,
+		.TAM_BUFFER = TAM_BUFFER,
 	};
 	Q_controller_setup.kp = 0.45 * Q_controller_setup.ku;
 	Q_controller_setup.ki = 1.2 * Q_controller_setup.kp / Q_controller_setup.pu;
 
 	struct controller_setup Ni_controller_setup = {
-		"ani",
-		100.0,
-		0.0,
-		500.0,
-		0.1,
-		TAM_BUFFER,
+		.prefix = "ani",
+		.overflow = 100.0,
+		.underflow = 0.0,
+		.ku = 500.0,
+		.pu = 0.1,
+		.TAM_BUFFER = TAM_BUFFER,
 	};
 	Ni_controller_setup.kp = 0.45 * Ni_controller_setup.ku;
 	Ni_controller_setup.ki = 1.2 * Ni_controller_setup.kp / Ni_controller_setup.pu;
 
 	struct controller_setup Nf_controller_setup = {
-		"anf",
-		100.0,
-		0.0,
-		-500.0,
-		0.1,
-		TAM_BUFFER,
+		.prefix = "anf",
+		.overflow = 100.0,
+		.underflow = 0.0,
+		.ku = -500.0,
+		.pu = 0.1,
+		.TAM_BUFFER = TAM_BUFFER,
 	};
 	Nf_controller_setup.kp = 0.45 * Nf_controller_setup.ku;
 	Nf_controller_setup.ki = 1.2 * Nf_controller_setup.kp / Nf_controller_setup.pu;
 
-	struct controller_setups[] = {&Na_controller_setup, &Q_controller_setup};
+	// struct controller_setups[] = {&Na_controller_setup, &Q_controller_setup};
 
 	struct control_info temperature_control_info = {
-		"st-0",
-		&Na_controller_setup,
-		&temperature_error,
-		&temperature_ref,
-		temperature,
-		socket_local,
-		endereco_destino,
-		small_interval,
-		TAM_BUFFER,
+		.prefix = "st-0",
+		.controllers_setups = &Na_controller_setup,
+		.error = &temperature_error,
+		.ref = &temperature_ref,
+		.controlled_variable = temperature,
+		.socket_local = socket_local,
+		.endereco_destino = endereco_destino,
+		.small_interval = small_interval,
+		.TAM_BUFFER = TAM_BUFFER,
 	};
 
-	// struct control_info height_control_info = {
-	// 	controller_setups,
-	// 	&height_ref,
-	// 	height,
-	// 	socket_local,
-	// 	endereco_destino,
-	// 	small_interval,
-	// 	TAM_BUFFER,
-	// };
+	struct control_info height_control_info = {
+		.prefix = "sh-0",
+		.controllers_setups = &Ni_controller_setup,
+		.error = &height_error,
+		.ref = &height_ref,
+		.controlled_variable = height,
+		.socket_local = socket_local,
+		.endereco_destino = endereco_destino,
+		.small_interval = small_interval,
+		.TAM_BUFFER = TAM_BUFFER,
+	};
 
 	struct state_info alarm_info = {
 		state,
@@ -442,6 +433,9 @@ int main(int argc, char *argv[])
 
 	pthread_t temperature_control_thread;
 	pthread_create(&temperature_control_thread, NULL, control_thread_function, &temperature_control_info);
+
+	pthread_t height_control_thread;
+	pthread_create(&height_control_thread, NULL, control_thread_function, &height_control_info);
 
 	while(1) {
 		// Inteface usuario
