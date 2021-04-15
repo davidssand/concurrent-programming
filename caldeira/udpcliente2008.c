@@ -54,12 +54,13 @@ struct controller_setup {
 struct state_info {
 	char *state;
 	char *temperature;
+	const int small_interval;
 };
 
 pthread_mutex_t socket_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t screen_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-float alarming_temperature = 24;
+float alarming_temperature = 21;
 float temperature_ref = 20;
 float height_ref = 2;
 
@@ -270,11 +271,23 @@ void *inputs_thread_function(void *args) {
 }
 
 void handle_alarm(struct state_info *alarm_info) {
+	struct timespec t0;
+	clock_gettime(CLOCK_MONOTONIC ,&t0);
+
 	while (1) {
+		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
+
 		if (atof(alarm_info->temperature) > alarming_temperature) {
 			strcpy(alarm_info->state, "ALARME");
 		} else {
 			strcpy(alarm_info->state, "OK");
+		}
+
+		t0.tv_nsec += alarm_info->small_interval;
+
+		while (t0.tv_nsec >= NSEC_PER_SEC) {
+			t0.tv_nsec -= NSEC_PER_SEC;
+			t0.tv_sec++;
 		}
 	}
 	// Not needed, just to keep it safe for the future
@@ -401,7 +414,7 @@ int main(int argc, char *argv[]) {
 	// Time
 	const int temperature_small_interval = 50000000; // 50ms
 	const int height_small_interval = 70000000; // 70ms
-
+	const int alarm_small_interval = 10000000; // 10ms
 
 	// Define controladores
 	struct controller_setup Na_controller_setup = {
@@ -483,8 +496,9 @@ int main(int argc, char *argv[]) {
 
 	// Define information necessary for the alarm
 	struct state_info alarm_info = {
-		state,
-		temperature,
+		.state = state,
+		.temperature = temperature,
+		.small_interval = alarm_small_interval,
 	};
 
 
@@ -513,7 +527,8 @@ int main(int argc, char *argv[]) {
 
 		// Inteface usuario
 		printf("\n\n\n\n");
-		printf("State                      <<< %s >>>\n\n", alarm_info.state);
+		printf("State                      <<< %s >>>\n", alarm_info.state);
+		printf("Alarming temperature       --- %f ---\n\n", alarming_temperature);
 		
 		printf("Temperature reference      >>> %f <<<\n", temperature_ref);
 		printf("Temperature                --- %s\n", temperature);
