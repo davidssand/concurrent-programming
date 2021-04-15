@@ -65,6 +65,7 @@ float temperature_ref = 20;
 float height_ref = 2;
 
 struct control_info {
+	char *name;
 	char *prefix;
 	struct controller_setup *controller_setup1;
 	struct controller_setup *controller_setup2;
@@ -270,9 +271,28 @@ void *inputs_thread_function(void *args) {
 
 }
 
+FILE *create_output_file(char *name) {
+	FILE *output_file;
+
+	char file_name[1024];
+	sprintf(file_name, "%s.csv", name);
+
+	output_file = fopen(file_name, "w");
+	
+	if(output_file == NULL) {
+        printf("File couldn't be opened\n");
+        exit(1);
+    }
+
+	return output_file;
+}
+
 void handle_alarm(struct state_info *alarm_info) {
-	struct timespec t0;
+	struct timespec t0, t1;
+	long response_time;
+	
 	clock_gettime(CLOCK_MONOTONIC ,&t0);
+	FILE *output_file = create_output_file("alarm");
 
 	while (1) {
 		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t0, NULL);
@@ -283,6 +303,12 @@ void handle_alarm(struct state_info *alarm_info) {
 			strcpy(alarm_info->state, "OK");
 		}
 
+		// Tempo de resposta
+		clock_gettime(CLOCK_MONOTONIC, &t1);
+		response_time = (t1.tv_sec - t0.tv_sec) * NSEC_PER_SEC + (t1.tv_nsec - t0.tv_nsec);
+
+		fprintf(output_file,"%ld\n", response_time);
+		
 		t0.tv_nsec += alarm_info->small_interval;
 
 		while (t0.tv_nsec >= NSEC_PER_SEC) {
@@ -290,6 +316,8 @@ void handle_alarm(struct state_info *alarm_info) {
 			t0.tv_sec++;
 		}
 	}
+	fclose(output_file);
+
 	// Not needed, just to keep it safe for the future
 	pthread_exit(NULL);
 }
@@ -305,14 +333,7 @@ void control_function(struct control_info *control_info_struct) {
 	long response_time;
 
 	// File
-	FILE *output_file;
-
-	output_file = fopen("response_times.csv", "w");
-	
-	if(output_file == NULL) {
-        printf("File couldn't be opened\n");
-        exit(1);
-    }
+	FILE *output_file = create_output_file(control_info_struct->name);
 
 	while (1) {
 
@@ -464,6 +485,7 @@ int main(int argc, char *argv[]) {
 
 	// Define all temperature necessary control info
 	struct control_info temperature_control_info = {
+		.name = "temperature",
 		.prefix = "st-0",
 		.controller_setup1 = &Na_controller_setup,
 		.controller_setup2 = &Q_controller_setup,
@@ -480,6 +502,7 @@ int main(int argc, char *argv[]) {
 
 	// Define all height necessary control info
 	struct control_info height_control_info = {
+		.name = "height",
 		.prefix = "sh-0",
 		.controller_setup1 = &Ni_controller_setup,
 		.controller_setup2 = &Nf_controller_setup,
