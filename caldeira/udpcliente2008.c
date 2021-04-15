@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #define NSEC_PER_SEC (1000000000) /* The number of nsecs per sec. */
 
@@ -56,6 +57,9 @@ struct state_info {
 };
 
 pthread_mutex_t socket_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t screen_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+float alarming_temperature = 24;
 float temperature_ref = 20;
 float height_ref = 2;
 
@@ -225,14 +229,35 @@ float read_and_parse(
 	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
-void check_for_user_inputs() {
-	float a;
-	float b;
-	// Taking multiple inputs
-	scanf("%f%f", &a, &b);
+void check_user_input() {
+	char enter;
+	scanf("%c", &enter);
+	if(enter != 'r') {
+		check_user_input();
+	}
+}
 
-	temperature_ref = a;
-	height_ref = b;
+void check_for_user_inputs() {
+	float new_temperature_ref;
+	float new_height_ref;
+
+	check_user_input();
+
+	// Lock screen
+    pthread_mutex_lock(&screen_mutex);
+
+	printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+
+	printf("\n\tReferencia Temperature: ");
+	scanf("%f", &new_temperature_ref);
+	printf("\n\tReferencia Altura:      ");
+	scanf("%f", &new_height_ref);
+
+	// Unlock screen
+    pthread_mutex_unlock(&screen_mutex);
+
+	temperature_ref = new_temperature_ref;
+	height_ref = new_height_ref;
 }
 
 void *inputs_thread_function(void *args) {
@@ -245,7 +270,6 @@ void *inputs_thread_function(void *args) {
 }
 
 void handle_alarm(struct state_info *alarm_info) {
-	float alarming_temperature = 38;
 	while (1) {
 		if (atof(alarm_info->temperature) > alarming_temperature) {
 			strcpy(alarm_info->state, "ALARME");
@@ -342,8 +366,7 @@ void *control_thread_function(void *received_struct) {
 	control_function(received_struct);
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 	if (argc < 3) { 
 		fprintf(stderr,"Uso: udpcliente endereço porta palavra \n");
 		fprintf(stderr,"onde o endereço é o endereço do servidor \n");
@@ -352,27 +375,35 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"   udpcliente baker.das.ufsc.br 1234 \"ola\"\n");
 		exit(FALHA);
 	}
+
+
 	// Socket
 	int porta_destino = atoi( argv[2]);
 	int socket_local = cria_socket_local();
 	struct sockaddr_in endereco_destino = cria_endereco_destino(argv[1], porta_destino);
+
 
 	// Message
 	int TAM_BUFFER = 10000;    
   	char temperature[TAM_BUFFER + 1];
   	char height[TAM_BUFFER + 1];
   	char Ti[TAM_BUFFER + 1];
+
+
+	// State
   	char state[7] = "OK";
 
+	// Errors
 	float temperature_error;
 	float height_error;
 
+
 	// Time
-	const int temperature_small_interval = 50000000; // 30ms
-	const int height_small_interval = 70000000; // 30ms
+	const int temperature_small_interval = 50000000; // 50ms
+	const int height_small_interval = 70000000; // 70ms
+
 
 	// Define controladores
-
 	struct controller_setup Na_controller_setup = {
 		.prefix = "ana",
 		.overflow = 10.0,
@@ -417,8 +448,8 @@ int main(int argc, char *argv[])
 	Nf_controller_setup.kp = 0.45 * Nf_controller_setup.ku;
 	Nf_controller_setup.ki = 1.2 * Nf_controller_setup.kp / Nf_controller_setup.pu;
 
-	// struct controller_setups[] = {&Na_controller_setup, &Q_controller_setup};
 
+	// Define all temperature necessary control info
 	struct control_info temperature_control_info = {
 		.prefix = "st-0",
 		.controller_setup1 = &Na_controller_setup,
@@ -433,6 +464,8 @@ int main(int argc, char *argv[])
 		.TAM_BUFFER = TAM_BUFFER,
 	};
 
+
+	// Define all height necessary control info
 	struct control_info height_control_info = {
 		.prefix = "sh-0",
 		.controller_setup1 = &Ni_controller_setup,
@@ -447,12 +480,15 @@ int main(int argc, char *argv[])
 		.TAM_BUFFER = TAM_BUFFER,
 	};
 
+
+	// Define information necessary for the alarm
 	struct state_info alarm_info = {
 		state,
 		temperature,
 	};
 
 
+	// Define threads
 	pthread_t inputs_thread;
 	pthread_create(&inputs_thread, NULL, inputs_thread_function, NULL);
 	
@@ -472,6 +508,9 @@ int main(int argc, char *argv[])
 	pthread_create(&height_control_thread, &height_control_thread_attr, control_thread_function, &height_control_info);
 
 	while(1) {
+
+		pthread_mutex_lock(&screen_mutex);
+
 		// Inteface usuario
 		printf("\n\n\n\n");
 		printf("State                      <<< %s >>>\n\n", alarm_info.state);
@@ -488,10 +527,15 @@ int main(int argc, char *argv[])
 
 		printf("Ti                         --- %s\n\n", Ti);
 
-		// printf("Response time              --- %ld ns\n\n", response_time);
+		// nc_printf("Response time              --- %ld ns\n\n", response_time);
 
-		printf("To change references: \n");
-		printf("Temperature reference + Enter + Height reference + Enter\n");
+		printf("Para mudar a referencia: \n");
+		printf("Pressione r + Enter: \n");
+
+
+    	pthread_mutex_unlock(&screen_mutex);
+
+
 		usleep(500000);
 	}
 }
