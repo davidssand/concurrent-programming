@@ -1,23 +1,24 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <ctype.h>
+#include <conio.h>
 
-int main()
+int main(void)
 {
-   int num = 124235;
-   FILE *fptr;
-
-   // use appropriate location if you are using MacOS or Linux
-   fptr = fopen("test.csv","w");
-
-   if(fptr == NULL)
-   {
-      printf("Error!");   
-      exit(1);             
-   }
-
-   fprintf(fptr,"%d\n",num);
-   fprintf(fptr,"%d\n",num);
-   fclose(fptr);
-
-   return 0;
+    char ch;    // to store an input - single char
+    int number = 0; // to make number from inputs
+    printf("Enter a number: ");
+    int digits_cnt = 0;
+    while (digits_cnt < 4)
+    {
+        ch = _getche();
+        if (isdigit(ch))
+        {
+            number *= 10;  // add an order to number
+            number += ch - '0';  // add a decimal digit to number
+            digits_cnt++;  // count this digit to stop loop
+        }
+    }
+    // just to check result
+    printf("\nThe number %d was entered.\n", number);
+    return 0;
 }

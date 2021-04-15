@@ -55,7 +55,7 @@ struct state_info {
 	char *temperature;
 };
 
-// pthread_mutex_t mutex PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t socket_mutex = PTHREAD_MUTEX_INITIALIZER;
 float temperature_ref = 20;
 float height_ref = 2;
 
@@ -203,7 +203,9 @@ float controller(
 		// Store current integral value for next loop
 	previous_integral = integral;
 	
+	pthread_mutex_lock(&socket_mutex);
 	send_request(socket_local, endereco_destino, cs->control_action_str_parsed, cs->control_received_message, TAM_BUFFER);
+	pthread_mutex_unlock(&socket_mutex);
 }
 
 float read_and_parse(
@@ -216,7 +218,10 @@ float read_and_parse(
 	char msg_recebida[TAM_BUFFER];
 	const size_t read_from_prefix_size = strlen(read_from_prefix);
 
+	pthread_mutex_lock(&socket_mutex);
 	send_request(socket_local, endereco_destino, read_from_prefix, msg_recebida, TAM_BUFFER);
+	pthread_mutex_unlock(&socket_mutex);
+
 	slice_str(msg_recebida, read_from, read_from_prefix_size - 1, TAM_BUFFER);
 }
 
