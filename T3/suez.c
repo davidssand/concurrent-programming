@@ -15,13 +15,13 @@ pthread_cond_t cond_chanel = PTHREAD_COND_INITIALIZER;
 
 const int map_length = 40;
 char map[map_length];
-int chanel[2] = {15, 30};
+int chanel[2] = {15, 20};
 bool chanel_in_use = false;
 
 char boat_symbol = '&';
 char water_symbol = '_';
 
-int vel_min = 500000;
+int vel_min = 50000;
 int vel_max = 500000;
 
 struct boat {
@@ -33,6 +33,7 @@ struct boat {
 const int n_boats = 7;
 pthread_t boats_th[n_boats];
 pthread_t print_th;
+pthread_t gate_th;
 struct boat boats[n_boats];
 
 void safe_printf(const char *fmt, ...) {
@@ -72,16 +73,20 @@ void update_map(int current_pos_x, int new_pos_x) {
     pthread_mutex_unlock(&mutex_map);
 }
 
-void update_chanel_in_use(struct boat *boat, int new_pos_x) {
-    if (!boat->after_chanel){
+void *gate_thread_function(void *arg) {
+    while (1) {
+        pthread_mutex_lock(&mutex_chanel);
         bool old_chanel_in_use = chanel_in_use;
-        chanel_in_use = in_chanel(new_pos_x);
-        if (old_chanel_in_use && !chanel_in_use) {
-            pthread_cond_broadcast(&cond_chanel);
-            boat->after_chanel = true;
+
+        bool any_boat_in_chanel = false;
+        for (int i = 0; i < n_boats; i++) {
+            if (in_chanel(boats[i].pos_x)) any_boat_in_chanel = true;
         }
-        // safe_printf("Old Chanel in use? %s\n", old_chanel_in_use ? "true" : "false");
-        // safe_printf("Chanel in use? %s\n", chanel_in_use ? "true" : "false");
+        chanel_in_use = any_boat_in_chanel;
+
+        if (old_chanel_in_use && !chanel_in_use) pthread_cond_broadcast(&cond_chanel);
+        pthread_mutex_unlock(&mutex_chanel);
+		usleep(vel_min);
     }
 }
 
@@ -89,26 +94,26 @@ bool nothing_at(int new_pos_x) {
     return map[new_pos_x] != boat_symbol;
 }
 
+void wait_for_signal(pos_x) {
+    pthread_mutex_lock(&mutex_chanel);
+    while (chanel_in_use && !after_chanel_entrance(pos_x)) {    
+        pthread_cond_wait(&cond_chanel, &mutex_chanel);
+    }
+    pthread_mutex_unlock(&mutex_chanel);
+}
+
 void *move_boat(struct boat *boat) {
     while (1) {
-        // safe_printf("-----");
         int current_pos_x = boat->pos_x;
         int new_pos_x = current_pos_x + 1;
-        // safe_printf("Current pos %d\n", current_pos_x);
-        // safe_printf("%d\n", new_pos_x);
 
-        pthread_mutex_lock(&mutex_chanel);
         if (nothing_at(new_pos_x)){
-            bool boat_after_chanel_entrance = after_chanel_entrance(new_pos_x);
-            if (boat_after_chanel_entrance) update_chanel_in_use(boat, new_pos_x);
-
-            while (chanel_in_use && !boat_after_chanel_entrance) {
-                pthread_cond_wait(&cond_chanel, &mutex_chanel);
+            if (new_pos_x == chanel[0]) {
+                wait_for_signal(current_pos_x);
             }
             update_map(current_pos_x, new_pos_x);
             boat->pos_x = new_pos_x;
         }
-        pthread_mutex_unlock(&mutex_chanel);
 		usleep(boat->vel);
     }
 }
@@ -137,24 +142,32 @@ void *print_thread_function(void *arg) {
 	while(1) {
         safe_printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         print_map();
-		usleep(50000);
+		usleep(vel_min);
     }
+}
+
+void create_threads() {
+    for (int i = 0; i < n_boats; i++) {
+        pthread_create(&boats_th[i], NULL, &move_boat_thread_function, &boats[i]);
+    }
+    pthread_create(&print_th, NULL, &print_thread_function, NULL);
+    pthread_create(&gate_th, NULL, &gate_thread_function, NULL);
+}
+
+void join_threads() {
+    for (int i = 0; i < n_boats; i++) {
+        pthread_join(boats_th[i], NULL);
+    }
+    pthread_join(print_th, NULL);
+    pthread_join(gate_th, NULL);
 }
 
 int main(int argc, char* argv[]) {
     srand(time(NULL));
     int r = rand();
-    safe_printf("%d", r);
 
     initialize_map();
     
-    for (int i = 0; i < n_boats; i++) {
-        pthread_create(&boats_th[i], NULL, &move_boat_thread_function, &boats[i]);
-    }
-    pthread_create(&print_th, NULL, &print_thread_function, NULL);
-
-    for (int i = 0; i < n_boats; i++) {
-        pthread_join(boats_th[i], NULL);
-    }
-    pthread_join(print_th, NULL);
+    create_threads();
+    join_threads();
 }
