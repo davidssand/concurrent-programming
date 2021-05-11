@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <time.h>
+
 
 pthread_mutex_t mutex_print = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_chanel = PTHREAD_MUTEX_INITIALIZER;
@@ -12,13 +14,17 @@ pthread_mutex_t mutex_map = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond_chanel = PTHREAD_COND_INITIALIZER;
 
 const int map_length = 40;
-int map[map_length];
-int chanel[2] = {10, 13};
+char map[map_length];
+int chanel[2] = {15, 30};
 bool chanel_in_use = false;
+
+char boat_symbol = '&';
+char water_symbol = '_';
 
 struct boat {
     int pos_x;
     bool after_chanel;
+    int vel;
 };
 
 const int n_boats = 7;
@@ -45,7 +51,7 @@ void print_map(){
     safe_printf("> ");
     for (int i = 0; i < map_length; i++) {
         if (in_chanel(i)) safe_printf("\033[0;31m"); 
-        safe_printf("%d ", map[i]);
+        safe_printf("%c ", map[i]);
         if (in_chanel(i)) safe_printf("\033[0m");
 
     }
@@ -54,8 +60,8 @@ void print_map(){
 
 void update_map(int current_pos_x, int new_pos_x) {
     pthread_mutex_lock(&mutex_map);
-    map[current_pos_x] = 0;
-    map[new_pos_x] = 1;
+    map[current_pos_x] = water_symbol;
+    map[new_pos_x] = boat_symbol;
     pthread_mutex_unlock(&mutex_map);
 }
 
@@ -73,7 +79,7 @@ void update_chanel_in_use(struct boat *boat, int new_pos_x) {
 }
 
 bool nothing_at(int new_pos_x) {
-    return !map[new_pos_x];
+    return map[new_pos_x] != boat_symbol;
 }
 
 void *move_boat(struct boat *boat) {
@@ -96,7 +102,7 @@ void *move_boat(struct boat *boat) {
             boat->pos_x = new_pos_x;
         }
         pthread_mutex_unlock(&mutex_chanel);
-		usleep(500000);
+		usleep(boat->vel);
     }
 }
 
@@ -106,14 +112,17 @@ void *move_boat_thread_function(void *arg) {
 
 void initialize_map() {
     for (int i = 0; i < map_length; i++) {
-        map[i] = 0;
+        map[i] = water_symbol;
     }
 
     for (int i = 0; i < n_boats; i++) {
         if ((i - 1) >= 0) boats[i].pos_x = boats[i - 1].pos_x + 1;
         else boats[i].pos_x = 0;
-        map[boats[i].pos_x] = 1;
+        map[boats[i].pos_x] = boat_symbol;
         boats[i].after_chanel = false;
+        boats[i].vel = (rand() % (1000000 - 50000 + 1)) + 50000;
+        safe_printf("%d\n", boats[i].vel);
+        
     }
 }
 
@@ -121,11 +130,15 @@ void *print_thread_function(void *arg) {
 	while(1) {
         safe_printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         print_map();
-		usleep(250000);
+		usleep(50000);
     }
 }
 
 int main(int argc, char* argv[]) {
+    srand(time(NULL));
+    int r = rand();
+    safe_printf("%d", r);
+
     initialize_map();
     
     for (int i = 0; i < n_boats; i++) {
